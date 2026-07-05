@@ -1,15 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Menu, Search, X } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { SearchInput } from "./search-input";
+import { useFetchData } from "@/hooks/useFetch";
+import { MovieType } from "@/lib/movies";
+import { useDebounceValue } from "usehooks-ts";
 
 function TopNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [debouncedSearchValue, setDebouncedSearchValue] = useDebounceValue("", 500);
+
+  const { data, isLoading } = useFetchData<MovieType[]>(`movies?search=${debouncedSearchValue}`, false);
+  const movies =
+    data?.slice(0, 5)?.map((movie) => {
+      return { title: movie.title, poster: movie.poster, releaseDate: movie.releaseDate, _id: movie._id };
+    }) || [];
 
   return (
-    <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/8 bg-[#101010]/80 backdrop-blur-xl">
+    <nav className="border-b border-white/8 bg-[#101010]/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-360 items-center justify-between px-4 py-4 sm:px-6 lg:px-16">
         <div className="flex items-center gap-8">
           <Link
@@ -52,20 +62,20 @@ function TopNav() {
             <Bell className="h-4 w-4" />
           </button>
           <div className="hidden md:block">
-            <SearchInput />
+            <SearchInput movies={movies} loading={isLoading} setSearchQuery={setDebouncedSearchValue} />
           </div>
         </div>
       </div>
 
       <div
         id="mobile-nav-menu"
-        className={`border-t border-white/8 bg-[#0f0f0f]/98 px-4 py-4 backdrop-blur-xl transition-all duration-200 md:hidden ${
-          mobileMenuOpen ? "max-h-[32rem] opacity-100" : "pointer-events-none max-h-0 overflow-hidden py-0 opacity-0"
+        className={`border-t border-white/8 bg-[#0f0f0f]/98 px-4 py-4 backdrop-blur-xl transition-all duration-200  ${
+          mobileMenuOpen ? "max-h-128 opacity-100" : "pointer-events-none max-h-0 overflow-hidden py-0 opacity-0 hidden"
         }`}
       >
         <div className="mx-auto flex max-w-360 flex-col gap-4">
           <div className="rounded-2xl border border-white/8 bg-white/5 p-3">
-            <SearchInput />
+            <SearchInput movies={movies} loading={isLoading} setSearchQuery={setDebouncedSearchValue} />
           </div>
 
           <div className="grid gap-2">
@@ -76,27 +86,6 @@ function TopNav() {
             >
               Browse
             </Link>
-            {/* <Link
-              href="/movies/inception"
-              className="rounded-xl border border-white/8 bg-white/5 px-4 py-3 text-sm font-semibold text-[#e5e2e1] transition-colors hover:border-[#e50914]/35 hover:bg-white/8"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Movies
-            </Link>
-            <Link
-              href="#"
-              className="rounded-xl border border-white/8 bg-white/5 px-4 py-3 text-sm font-semibold text-[#e5e2e1] transition-colors hover:border-[#e50914]/35 hover:bg-white/8"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              TV Shows
-            </Link>
-            <Link
-              href="#"
-              className="rounded-xl border border-white/8 bg-white/5 px-4 py-3 text-sm font-semibold text-[#e5e2e1] transition-colors hover:border-[#e50914]/35 hover:bg-white/8"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              My List
-            </Link> */}
           </div>
         </div>
       </div>

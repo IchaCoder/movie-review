@@ -1,41 +1,80 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronRight, Clock3, Play, Star } from "lucide-react";
-import { getMovieById, getMovieCards, movies } from "@/lib/movies";
+import { ArrowLeft, ArrowUpRight, Film, Play, Star } from "lucide-react";
+import type { MovieType } from "@/lib/movies";
+import clientPromise from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 type MoviePageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export function generateStaticParams() {
-  return movies.map((movie) => ({ id: movie.id }));
+const reviews = [
+  {
+    author: "LateNightQueue",
+    rating: 5,
+    comment: "A strong shelf of recommendations when I want something dark and atmospheric.",
+  },
+  {
+    author: "MoodSetter",
+    rating: 4,
+    comment: "The selection feels intentional instead of random, which makes it easy to start watching.",
+  },
+];
+
+// {
+//   params: Promise<{ slug: string }>;
+// }
+
+export async function generateStaticParams() {
+  const movies = fetch(`${process.env.NEXT_PUBLIC_API_URL}/movies`, { cache: "no-store" }).then((res) =>
+    res.json(),
+  ) as unknown as Promise<MovieType[]>;
+  const moviesData = await movies;
+  return moviesData.map((movie: { _id: string }) => ({
+    id: movie._id,
+  }));
 }
 
-const trendingMovies = getMovieCards();
+async function getMovieById(id: string): Promise<MovieType | null> {
+  try {
+    const client = await clientPromise;
+    const db = client.db("movie-api-db");
+    const moviesCollection = db.collection("movies");
 
-export default function MovieDetailsPage({ params }: MoviePageProps) {
-  // const movie = getMovieById(params.id);
-  const movie = getMovieById("tenet");
+    const movie = await moviesCollection.findOne({ _id: new ObjectId(id) });
+
+    return movie as MovieType | null;
+  } catch (error) {
+    console.error("Error fetching movie by ID:", error);
+    return null;
+  }
+}
+
+export default async function MovieDetailsPage({ params }: MoviePageProps) {
+  const paramId = (await params).id;
+
+  const movie = await getMovieById(paramId);
 
   if (!movie) {
     notFound();
   }
 
-  const relatedMovies = movie.relatedIds
-    .map((relatedId) => getMovieById(relatedId))
-    .filter((relatedMovie): relatedMovie is NonNullable<typeof relatedMovie> => Boolean(relatedMovie));
+  const backdrop = movie.backdrops[0] ?? movie.poster;
+  const trailerEmbedUrl = getYouTubeEmbedUrl(movie.trailerLink);
+  const meta = [movie.releaseDate, movie.genres.slice(0, 3).join(" · ")].filter(Boolean).join(" · ");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <section className="relative overflow-hidden border-b border-white/5">
         <div
           className="absolute inset-0 scale-105 bg-cover bg-center"
-          style={{ backgroundImage: `url(${movie.backdrop})` }}
+          style={{ backgroundImage: `url(${backdrop})` }}
         />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,10,10,0.08)_0%,rgba(10,10,10,0.42)_42%,rgba(10,10,10,0.94)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(229,9,20,0.12),transparent_28%),radial-gradient(circle_at_left,rgba(75,142,255,0.08),transparent_30%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,10,10,0.08)_0%,rgba(10,10,10,0.56)_48%,rgba(10,10,10,0.96)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(229,9,20,0.14),transparent_30%),radial-gradient(circle_at_left,rgba(75,142,255,0.1),transparent_30%)]" />
 
         <div className="relative mx-auto max-w-360 px-4 pb-12 pt-6 sm:px-6 lg:px-16 lg:pb-16 lg:pt-8">
           <Link
@@ -46,23 +85,16 @@ export default function MovieDetailsPage({ params }: MoviePageProps) {
             Back to home
           </Link>
 
-          <div className="mt-10 grid gap-8 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
-            <div className="max-w-3xl space-y-5">
-              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-[#e9bcb6]">
-                <span className="rounded bg-[#e50914] px-3 py-1 text-[#fff7f6] shadow-[0_0_18px_rgba(229,9,20,0.34)]">
-                  {movie.maturity}
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  {movie.year} · {movie.genre} · {movie.duration}
-                </span>
+          <div className="mt-10 space-y-8 lg:mt-12">
+            <div className="max-w-4xl space-y-4">
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase text-[#e9bcb6]">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">{meta}</span>
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-semibold uppercase tracking-[0.32em] text-[#ffb4aa]">Featured Film</p>
-                <h1 className="font-heading text-5xl font-black uppercase tracking-tight text-[#f4f1f0] sm:text-7xl lg:text-[6.25rem] lg:leading-[0.94]">
+                <h1 className="font-heading text-5xl font-black tracking-tight text-[#f4f1f0] sm:text-7xl lg:text-[4.75rem] lg:leading-[0.96]">
                   {movie.title}
                 </h1>
-                <p className="max-w-2xl text-base leading-8 text-[#e9bcb6] sm:text-lg">{movie.tagline}</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-5 text-sm text-[#e5e2e1]">
@@ -70,46 +102,60 @@ export default function MovieDetailsPage({ params }: MoviePageProps) {
                   <Star className="h-4 w-4 fill-current" />
                   {movie.rating}/10 IMDb
                 </span>
-                <span className="inline-flex items-center gap-2 text-[#ff7d66]">
-                  <Star className="h-4 w-4 fill-current" />
-                  {movie.score} audience score
-                </span>
-                <span className="inline-flex items-center gap-2 text-[#e9bcb6]">
-                  <Clock3 className="h-4 w-4" />
-                  {movie.duration}
-                </span>
-              </div>
-
-              <p className="max-w-2xl text-base leading-8 text-[#e9bcb6]">{movie.synopsis}</p>
-
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <button className="inline-flex items-center gap-3 rounded-xl bg-[#e50914] px-7 py-4 text-base font-semibold text-[#fff7f6] shadow-[0_0_26px_rgba(229,9,20,0.28)] transition-all hover:-translate-y-0.5 hover:bg-[#c0000c]">
-                  <Play className="h-5 w-5 fill-current" />
-                  Play Trailer
-                </button>
-                <button className="inline-flex items-center gap-3 rounded-xl border border-white/12 bg-white/8 px-7 py-4 text-base font-semibold text-[#e5e2e1] backdrop-blur-sm transition-all hover:border-[#ffb4aa]/35 hover:bg-white/12">
-                  Add to Watchlist
-                </button>
               </div>
             </div>
 
-            <div className="justify-self-start lg:justify-self-end">
-              <div className="glass-card-strong w-full max-w-sm overflow-hidden rounded-[2rem] p-4 shadow-[0_30px_70px_-28px_rgba(0,0,0,0.7)]">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.72fr)] lg:items-stretch">
+              <div className="order-2 overflow-hidden rounded-[2rem] border border-white/10 bg-black/35 shadow-[0_30px_80px_-34px_rgba(0,0,0,0.8)] lg:order-0">
                 <div
-                  className="aspect-2/3 overflow-hidden rounded-[1.4rem] bg-cover bg-center"
+                  className="relative aspect-2/3 h-full min-h-112 bg-cover bg-center sm:min-h-136 lg:min-h-160"
                   style={{ backgroundImage: `url(${movie.poster})` }}
-                />
-                <div className="mt-4 flex items-center justify-between text-sm">
-                  <span className="text-[#e9bcb6]">Release</span>
-                  <span className="font-semibold text-[#f4f1f0]">{movie.releaseDate}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-[#e9bcb6]">Director</span>
-                  <span className="font-semibold text-[#f4f1f0]">{movie.director}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-[#e9bcb6]">Status</span>
-                  <span className="font-semibold text-[#f4f1f0]">{movie.status}</span>
+                ></div>
+              </div>
+
+              <div className="order-1 overflow-hidden rounded-[2rem] border border-white/10 bg-black/45 shadow-[0_30px_80px_-34px_rgba(0,0,0,0.82)] lg:order-0 lg:col-start-2 lg:row-start-1">
+                <div className="p-3 sm:p-4">
+                  <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black shadow-[0_20px_60px_-24px_rgba(0,0,0,0.85)]">
+                    {trailerEmbedUrl ? (
+                      <iframe
+                        className="aspect-video w-full"
+                        src={trailerEmbedUrl}
+                        title={`${movie.title} trailer`}
+                        loading="lazy"
+                        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <div className="flex aspect-video items-center justify-center px-6 text-center text-sm text-[#b48d88]">
+                        Trailer is unavailable for this movie.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-1 pb-1">
+                    <div className="flex flex-wrap gap-2">
+                      {movie.genres.slice(0, 3).map((genre) => (
+                        <span
+                          key={genre}
+                          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-[#f4f1f0]"
+                        >
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+
+                    {movie.trailerLink ? (
+                      <Link
+                        href={movie.trailerLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-[#e5e2e1] backdrop-blur-sm transition-colors hover:border-[#ffb4aa]/35 hover:bg-white/12 hover:text-[#fff7f6]"
+                      >
+                        Open trailer
+                        <ArrowUpRight className="h-4 w-4" />
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
@@ -117,33 +163,8 @@ export default function MovieDetailsPage({ params }: MoviePageProps) {
         </div>
       </section>
 
-      <main className="mx-auto grid max-w-360 gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_360px] lg:px-16 lg:py-14">
+      <main className="mx-auto grid max-w-360 gap-8 px-4 py-10 sm:px-6 lg:px-16 lg:py-14">
         <section className="space-y-10">
-          <div className="space-y-4">
-            <h2 className="section-title font-heading text-3xl font-bold text-[#f4f1f0]">Overview</h2>
-            <p className="max-w-4xl text-base leading-8 text-[#e9bcb6]">{movie.synopsis}</p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="section-title font-heading text-3xl font-bold text-[#f4f1f0]">Cast</h2>
-              <button className="inline-flex items-center gap-2 text-sm font-semibold text-[#ffb4aa] transition-colors hover:text-[#fff7f6]">
-                View full credits <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-              {movie.cast.map((member) => (
-                <article key={member.name} className="glass-card min-w-37.5 rounded-2xl p-4 text-center">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1c1b1b] text-sm font-bold text-[#f4f1f0]">
-                    {member.initials}
-                  </div>
-                  <h3 className="mt-3 text-sm font-semibold text-[#f4f1f0]">{member.name}</h3>
-                  <p className="mt-1 text-xs text-[#e9bcb6]">{member.role}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
           <div className="grid gap-4 md:grid-cols-2">
             <article className="glass-card rounded-3xl p-6">
               <h2 className="section-title font-heading text-2xl font-bold text-[#f4f1f0]">Why watch it</h2>
@@ -152,26 +173,12 @@ export default function MovieDetailsPage({ params }: MoviePageProps) {
                 stakes. It is built for viewers who like movies that keep asking for one more watch.
               </p>
             </article>
-
-            <article className="glass-card rounded-3xl p-6">
-              <h2 className="section-title font-heading text-2xl font-bold text-[#f4f1f0]">Ratings snapshot</h2>
-              <div className="mt-5 space-y-3">
-                {[92, 78, 64, 46, 28].map((width, index) => (
-                  <div key={width} className="flex items-center gap-3 text-sm">
-                    <span className="w-12 text-[#e9bcb6]">{5 - index}★</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/8">
-                      <div className="h-full rounded-full bg-[#e50914]" style={{ width: `${width}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
           </div>
 
           <div className="space-y-4">
             <h2 className="section-title font-heading text-3xl font-bold text-[#f4f1f0]">Community reviews</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              {movie.reviews.map((review) => (
+              {reviews.map((review) => (
                 <article key={review.author} className="glass-card rounded-3xl p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -190,68 +197,35 @@ export default function MovieDetailsPage({ params }: MoviePageProps) {
             </div>
           </div>
         </section>
-
-        <aside className="space-y-6">
-          <div className="glass-card rounded-3xl p-6">
-            <h2 className="section-title font-heading text-2xl font-bold text-[#f4f1f0]">Quick facts</h2>
-            <dl className="mt-5 space-y-4 text-sm">
-              <div className="flex items-start justify-between gap-4 border-b border-white/8 pb-3">
-                <dt className="text-[#e9bcb6]">Status</dt>
-                <dd className="text-right font-semibold text-[#f4f1f0]">{movie.status}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 border-b border-white/8 pb-3">
-                <dt className="text-[#e9bcb6]">Release date</dt>
-                <dd className="text-right font-semibold text-[#f4f1f0]">{movie.releaseDate}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 border-b border-white/8 pb-3">
-                <dt className="text-[#e9bcb6]">Director</dt>
-                <dd className="text-right font-semibold text-[#f4f1f0]">{movie.director}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4 border-b border-white/8 pb-3">
-                <dt className="text-[#e9bcb6]">Budget</dt>
-                <dd className="text-right font-semibold text-[#f4f1f0]">{movie.budget}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt className="text-[#e9bcb6]">Box office</dt>
-                <dd className="text-right font-semibold text-[#f4f1f0]">{movie.boxOffice}</dd>
-              </div>
-            </dl>
-
-            <div className="mt-6">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.28em] text-[#e9bcb6]">Genres</h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {movie.genres.map((genre) => (
-                  <span
-                    key={genre}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#f4f1f0]"
-                  >
-                    {genre}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-3xl p-6">
-            <h2 className="section-title font-heading text-2xl font-bold text-[#f4f1f0]">More like this</h2>
-            <div className="mt-5 grid grid-cols-2 gap-4">
-              {relatedMovies.map((relatedMovie) => (
-                <Link key={relatedMovie.id} href={`/movies/${relatedMovie.id}`} className="group block">
-                  <div className="aspect-2/3 overflow-hidden rounded-2xl border border-white/8 bg-[#131313]">
-                    <div
-                      className="h-full w-full bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                      style={{ backgroundImage: `url(${relatedMovie.poster})` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-[#f4f1f0] group-hover:text-[#ffb4aa]">
-                    {relatedMovie.title}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </aside>
       </main>
     </div>
   );
+}
+
+function getYouTubeEmbedUrl(trailerLink: string) {
+  if (!trailerLink) {
+    return "";
+  }
+
+  try {
+    const url = new URL(trailerLink);
+
+    if (url.hostname.includes("youtube.com")) {
+      const videoId = url.searchParams.get("v");
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+      }
+    }
+
+    if (url.hostname.includes("youtu.be")) {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+      }
+    }
+
+    return trailerLink;
+  } catch {
+    return trailerLink;
+  }
 }

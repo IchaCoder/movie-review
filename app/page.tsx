@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { ChevronRight, Star } from "lucide-react";
-import { getMovieCards, MovieType } from "@/lib/movies";
+import { MovieType } from "@/lib/movies";
 import { HomeHero } from "@/components/home-hero";
 
-const trendingMovies = getMovieCards();
-
 const spotlightCards = [
-  { 
+  {
     eyebrow: "Directorial Debut",
     title: "Shadow of the Phoenix",
     body: "A masterpiece of modern noir storytelling.",
@@ -34,17 +32,16 @@ const spotlightCards = [
   },
 ];
 
-function fetchMovies(): Promise<MovieType[]> {
+async function fetchMovies(): Promise<MovieType[]> {
   return fetch(`${process.env.NEXT_PUBLIC_API_URL}/movies`, { cache: "no-store" }).then((res) => res.json());
 }
 
 export default async function Home() {
   const movies = await fetchMovies();
-  console.log(movies);
   const movie = movies[0];
 
   return (
-    <main className="pt-19">
+    <main className="">
       {movie ? <HomeHero movie={movie} /> : null}
 
       <section className="mx-auto max-w-360 px-4 py-10 sm:px-6 lg:px-16 lg:py-14">
@@ -53,27 +50,17 @@ export default async function Home() {
           <ChevronRight className="h-5 w-5 text-[#e50914]" />
         </div>
         <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-          {trendingMovies.map((movie) => (
+          {movies.map((movie) => (
             <Link
               key={movie.title}
-              href={`/movies/1`}
+              href={`/movies/${movie._id}`}
               className="group flex w-52.5 shrink-0 flex-col overflow-hidden rounded-2xl border border-white/8 bg-[#131313] transition-all duration-300 hover:-translate-y-1 hover:border-[#e50914]/40 hover:shadow-[0_20px_40px_-18px_rgba(229,9,20,0.55)]"
             >
               <div className="relative aspect-2/3 overflow-hidden">
                 <div
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                  style={{ backgroundImage: `url(${movie.art})` }}
+                  style={{ backgroundImage: `url(${movie.poster})` }}
                 />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,10,10,0.04)_0%,rgba(10,10,10,0.2)_56%,rgba(10,10,10,0.9)_100%)]" />
-                <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                  <div className="glass-card rounded-xl px-3 py-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-[#f4f1f0]">
-                      <span>{movie.title}</span>
-                      <span className="text-[#ffb4aa]">{movie.rating} ★</span>
-                    </div>
-                    <p className="mt-1 text-[11px] uppercase tracking-[0.22em] text-[#b48d88]">{movie.year}</p>
-                  </div>
-                </div>
               </div>
               <div className="flex items-center justify-between px-4 py-3 text-sm text-[#e5e2e1]">
                 <span className="truncate">{movie.title}</span>

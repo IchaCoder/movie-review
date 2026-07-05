@@ -229,4 +229,5 @@ export type MovieType = {
   poster: string;
   backdrops: string[];
   reviewIds: string[];
+  rating: string;
 };
