@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Inter, Montserrat } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import TopNav from "@/components/nav";
 import Footer from "@/components/footer";
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${inter.variable} ${montserrat.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <SpeedInsights />
         <div className="min-h-screen bg-background text-foreground">
           <TopNav />
           {children}
