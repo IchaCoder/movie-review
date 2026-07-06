@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
+import { revalidatePath } from "next/cache";
 
 type CreateReviewBody = {
   movieId?: string;
@@ -61,6 +62,8 @@ export async function POST(request: NextRequest) {
         },
       },
     );
+
+    revalidatePath(`/movies/${movieId}`);
 
     return NextResponse.json(
       {

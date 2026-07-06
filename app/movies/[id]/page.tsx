@@ -13,6 +13,8 @@ type MoviePageProps = {
   }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export async function generateStaticParams() {
   const movies = fetch(`${process.env.NEXT_PUBLIC_API_URL}/movies`, { cache: "no-store" }).then((res) =>
     res.json(),
