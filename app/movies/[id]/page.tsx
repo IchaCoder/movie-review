@@ -4,29 +4,14 @@ import { ArrowLeft, ArrowUpRight, Star } from "lucide-react";
 import type { MovieType } from "@/lib/movies";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { MovieReviewForm } from "@/components/movie-review-form";
+import { getReviewsByIds, type ReviewRecord } from "../../../lib/reviews";
 
 type MoviePageProps = {
   params: Promise<{
     id: string;
   }>;
 };
-
-const reviews = [
-  {
-    author: "LateNightQueue",
-    rating: 5,
-    comment: "A strong shelf of recommendations when I want something dark and atmospheric.",
-  },
-  {
-    author: "MoodSetter",
-    rating: 4,
-    comment: "The selection feels intentional instead of random, which makes it easy to start watching.",
-  },
-];
-
-// {
-//   params: Promise<{ slug: string }>;
-// }
 
 export async function generateStaticParams() {
   const movies = fetch(`${process.env.NEXT_PUBLIC_API_URL}/movies`, { cache: "no-store" }).then((res) =>
@@ -65,6 +50,7 @@ export default async function MovieDetailsPage({ params }: MoviePageProps) {
   const backdrop = movie.backdrops[0] ?? movie.poster;
   const trailerEmbedUrl = getYouTubeEmbedUrl(movie.trailerLink);
   const meta = [movie.releaseDate, movie.genres.slice(0, 3).join(" · ")].filter(Boolean).join(" · ");
+  const reviews: ReviewRecord[] = await getReviewsByIds(movie.reviewIds);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -175,26 +161,42 @@ export default async function MovieDetailsPage({ params }: MoviePageProps) {
             </article>
           </div>
 
-          <div className="space-y-4">
-            <h2 className="section-title font-heading text-3xl font-bold text-[#f4f1f0]">Community reviews</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {reviews.map((review) => (
-                <article key={review.author} className="glass-card rounded-3xl p-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h3 className="font-semibold text-[#f4f1f0]">{review.author}</h3>
-                      <p className="text-sm text-[#e9bcb6]">Audience review</p>
-                    </div>
-                    <div className="flex items-center gap-1 text-[#e50914]">
-                      {Array.from({ length: review.rating }, (_, index) => (
-                        <Star key={index} className="h-4 w-4 fill-current" />
-                      ))}
-                    </div>
-                  </div>
-                  <p className="mt-4 text-sm leading-7 text-[#e9bcb6]">{review.comment}</p>
-                </article>
-              ))}
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="section-title font-heading text-3xl font-bold text-[#f4f1f0]">Community reviews</h2>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#e9bcb6]">
+                  {reviews.length} total
+                </span>
+              </div>
+
+              {reviews.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {reviews.map((review) => (
+                    <article key={review.id} className="glass-card rounded-3xl p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="font-semibold text-[#f4f1f0]">{review.author}</h3>
+                          <p className="text-sm text-[#e9bcb6]">{formatReviewDate(review.createdAt)}</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-[#e50914]">
+                          {Array.from({ length: review.rating }, (_, index) => (
+                            <Star key={index} className="h-4 w-4 fill-current" />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="mt-4 text-sm leading-7 text-[#e9bcb6]">{review.comment}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="glass-card rounded-3xl p-6 text-sm leading-7 text-[#e9bcb6]">
+                  No reviews yet. Use the form to add the first one.
+                </div>
+              )}
             </div>
+
+            <MovieReviewForm movieId={movie._id} />
           </div>
         </section>
       </main>
@@ -228,4 +230,12 @@ function getYouTubeEmbedUrl(trailerLink: string) {
   } catch {
     return trailerLink;
   }
+}
+
+function formatReviewDate(dateString: string) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(dateString));
 }
